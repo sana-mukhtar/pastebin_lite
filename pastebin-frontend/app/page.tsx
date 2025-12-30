@@ -4,63 +4,72 @@ import { useState } from "react";
 
 export default function Home() {
   const [content, setContent] = useState("");
-  const [maxViews, setMaxViews] = useState("");
-  const [ttl, setTtl] = useState("");
-  const [url, setUrl] = useState("");
+  const [maxViews, setMaxViews] = useState(3);
+  const [ttlSeconds, setTtlSeconds] = useState(300); // default 5 minutes
+  const [pasteURL, setPasteURL] = useState("");
+  const [error, setError] = useState("");
 
   const createPaste = async () => {
-    const body: any = { content };
-    if (maxViews) body.max_views = Number(maxViews);
-    if (ttl) body.ttl_seconds = Number(ttl);
+    setError("");       // clear previous error
+    setPasteURL("");    // clear previous URL
 
-    const res = await fetch("http://localhost:8080/api/pastes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      alert("Failed to create paste");
+    if (!content) {
+      setError("Content cannot be empty.");
       return;
     }
 
-    const data = await res.json();
-    setUrl(data.url);
+    try {
+      const res = await fetch("http://localhost:8080/api/pastes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, max_views: maxViews, ttl_seconds: ttlSeconds }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to create paste");
+      }
+
+      const data = await res.json();
+      setPasteURL(data.url);
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
-  return (
-    <div style={{ maxWidth: 600, margin: "40px auto" }}>
-      <h2>Create Paste</h2>
+  const inputStyle = { width: "100%", padding: 8, marginBottom: 10, border: "2px solid #0070f3", borderRadius: 4 };
+  const smallInputStyle = { width: 80, padding: 6, border: "2px solid #0070f3", borderRadius: 4 };
 
+  return (
+    <div style={{ padding: 20, fontFamily: "sans-serif", maxWidth: 600, margin: "40px auto" }}>
+      <h1 style={{ textAlign: "center", marginBottom: 20 }}>Pastebin</h1>
+      {error && <p style={{ color: "red", textAlign: "center" }}>{error}</p>}
       <textarea
-        rows={6}
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder="Paste content"
-        style={{ width: "100%" }}
+        rows={10}
+        style={inputStyle}
+        placeholder="Enter your text here"
       />
+      <div style={{ marginBottom: 10 }}>
+        Max Views:{" "}
+        <input type="number" value={maxViews} min={1} onChange={(e) => setMaxViews(Number(e.target.value))} style={{ ...smallInputStyle, width: 50 }} />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        TTL (seconds):{" "}
+        <input type="number" value={ttlSeconds} min={1} onChange={(e) => setTtlSeconds(Number(e.target.value))} style={smallInputStyle} />
+      </div>
+      <button onClick={createPaste} style={{ width: "100%", padding: 10, background: "#0070f3", color: "#fff", border: "none", borderRadius: 4 }}>
+        Create Paste
+      </button>
 
-      <input
-        placeholder="Max views (optional)"
-        value={maxViews}
-        onChange={(e) => setMaxViews(e.target.value)}
-        style={{ border: "1", borderColor: "blue" }}
-      />
-
-      <input
-        placeholder="TTL seconds (optional)"
-        value={ttl}
-        onChange={(e) => setTtl(e.target.value)}
-        style={{ border: "5px", borderColor: "blue" }}
-
-      />
-
-      <button onClick={createPaste} style={{ backgroundColor: "lightskyblue" }}>Create</button>
-
-      {url && (
-        <p>
-          Share: <a href={url}>{url}</a>
-        </p>
+      {pasteURL && (
+        <div style={{ marginTop: 20, textAlign: "center" }}>
+          <p style={{ color: "green" }}>Paste created!</p>
+          <a href={pasteURL} target="_blank" rel="noreferrer" style={{ color: "#0070f3" }}>
+            {pasteURL}
+          </a>
+        </div>
       )}
     </div>
   );
