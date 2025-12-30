@@ -3,31 +3,26 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-export default function Paste() {
+export default function PastePage() {
     const { id } = useParams();
     const [content, setContent] = useState<string | null>(null);
     const [error, setError] = useState("");
 
     useEffect(() => {
-        if (!id) return;
         fetch(`http://localhost:8080/api/pastes/${id}`)
             .then((res) => {
-                if (!res.ok) throw new Error("Paste not found");
+                if (!res.ok) throw new Error("Paste unavailable");
                 return res.json();
             })
             .then((data) => setContent(data.content))
-            .catch((err) => setError(err.message));
+            .catch((e) => setError(e.message));
     }, [id]);
 
+    if (error) return <p>{error}</p>;
+
     return (
-        <div style={{ maxWidth: 600, margin: "50px auto", textAlign: "center" }}>
-            <h1>Paste Content</h1>
-            {error && <p>{error}</p>}
-            {content && (
-                <pre style={{ textAlign: "left", padding: 10 }}>
-                    {content}
-                </pre>
-            )}
-        </div>
+        <pre style={{ maxWidth: 600, margin: "40px auto" }}>
+            {content}
+        </pre>
     );
 }

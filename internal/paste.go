@@ -1,18 +1,22 @@
 package internal
 
 import (
-	"errors"
+	"encoding/json"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 type Paste struct {
+	ID        string
 	Content   string
-	ExpiresAt *time.Time
 	MaxViews  *int
 	Views     int
+	ExpiresAt *time.Time
 }
 
 var (
@@ -21,51 +25,89 @@ var (
 )
 
 // CreatePaste stores a new paste and returns its UUID
-func CreatePaste(content string, ttlSeconds *int, maxViews *int) string {
-	mu.Lock()
-	defer mu.Unlock()
+func CreatePaste(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 
-	id := uuid.New().String() // generate UUID
+	var req struct {
+		Content    string `json:"content"`
+		MaxViews   *int   `json:"max_views"`
+		TTLSeconds *int   `json:"ttl_seconds"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.Content) == "" {
+		http.Error(w, `{"error":"content required"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.MaxViews != nil && *req.MaxViews < 1 {
+		http.Error(w, `{"error":"max_views must be >= 1"}`, http.StatusBadRequest)
+		return
+	}
 
 	var expiresAt *time.Time
-	if ttlSeconds != nil {
-		t := time.Now().Add(time.Duration(*ttlSeconds) * time.Second)
+	if req.TTLSeconds != nil {
+		if *req.TTLSeconds < 1 {
+			http.Error(w, `{"error":"ttl_seconds must be >= 1"}`, http.StatusBadRequest)
+			return
+		}
+		t := time.Now().Add(time.Duration(*req.TTLSeconds) * time.Second)
 		expiresAt = &t
 	}
 
-	pastes[id] = &Paste{
-		Content:   content,
-		ExpiresAt: expiresAt,
-		MaxViews:  maxViews,
+	id := uuid.NewString()
+
+	store[id] = &Paste{
+		ID:        id,
+		Content:   req.Content,
+		MaxViews:  req.MaxViews,
 		Views:     0,
+		ExpiresAt: expiresAt,
 	}
-	return id
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"id":  id,
+		"url": "http://localhost:3000/paste/" + id,
+	})
 }
 
 // GetPaste retrieves a paste by ID, checks TTL and MaxViews
-func GetPaste(id string) (*Paste, error) {
-	mu.Lock()
-	defer mu.Unlock()
+func GetPaste(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 
-	p, ok := pastes[id]
+	id := mux.Vars(r)["id"]
+	paste, ok := store[id]
 	if !ok {
-		return nil, errors.New("paste not found")
+		http.NotFound(w, r)
+		return
 	}
 
-	// Check TTL
-	if p.ExpiresAt != nil && time.Now().After(*p.ExpiresAt) {
-		delete(pastes, id)
-		return nil, errors.New("paste expired")
+	// 🔹 View limit enforcement
+	if paste.MaxViews != nil && paste.Views >= *paste.MaxViews {
+		http.NotFound(w, r)
+		return
 	}
 
-	// Check max views
-	if p.MaxViews != nil && p.Views >= *p.MaxViews {
-		delete(pastes, id)
-		return nil, errors.New("paste view limit reached")
+	paste.Views++
+
+	var remaining *int
+	if paste.MaxViews != nil {
+		r := *paste.MaxViews - paste.Views
+		if r < 0 {
+			r = 0
+		}
+		remaining = &r
 	}
 
-	// Count the view
-	p.Views++
-
-	return p, nil
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"content":         paste.Content,
+		"remaining_views": remaining,
+		"expires_at":      nil,
+	})
 }
+
+var store = make(map[string]*Paste)
