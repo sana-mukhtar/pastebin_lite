@@ -2,8 +2,8 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,11 +12,13 @@ import (
 )
 
 type Paste struct {
-	ID        string
-	Content   string
-	MaxViews  *int
-	Views     int
-	ExpiresAt *time.Time
+	ID        string     `json:"id"`
+	Content   string     `json:"content"`
+	MaxViews  int        `json:"max_views,omitempty"`
+	TTL       int        `json:"ttl_seconds,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Views     int        `json:"views"`
 }
 
 var (
@@ -24,51 +26,65 @@ var (
 	pastes = make(map[string]*Paste)
 )
 
-// CreatePaste stores a new paste and returns its UUID
-func CreatePaste(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func validatePasteInput(content string, maxViews, ttl int) (string, bool) {
+	if content == "" {
+		return "content cannot be empty", false
+	}
 
+	// maxViews is optional; if provided, must be >= 1
+	if maxViews != 0 && maxViews < 1 {
+		return "max_views must be >= 1", false
+	}
+
+	// ttl is optional; if provided, must be >= 1
+	if ttl != 0 && ttl < 1 {
+		return "ttl_seconds must be >= 1", false
+	}
+
+	return "", true
+}
+
+// CreatePaste stores a new paste and returns its UUID
+func CreatePasteHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Content    string `json:"content"`
-		MaxViews   *int   `json:"max_views"`
-		TTLSeconds *int   `json:"ttl_seconds"`
+		Content  string `json:"content"`
+		MaxViews int    `json:"max_views"`
+		TTL      int    `json:"ttl_seconds"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
 		return
 	}
 
-	if strings.TrimSpace(req.Content) == "" {
-		http.Error(w, `{"error":"content required"}`, http.StatusBadRequest)
+	var msg string
+	var ok bool
+	// Validate using separate function
+	if msg, ok = validatePasteInput(req.Content, req.MaxViews, req.TTL); !ok {
+		http.Error(w, `{"error":"`+msg+`"}`, http.StatusBadRequest)
 		return
 	}
 
-	if req.MaxViews != nil && *req.MaxViews < 1 {
-		http.Error(w, `{"error":"max_views must be >= 1"}`, http.StatusBadRequest)
-		return
-	}
+	fmt.Println("Creating paste with content length:", msg, ok)
 
-	var expiresAt *time.Time
-	if req.TTLSeconds != nil {
-		if *req.TTLSeconds < 1 {
-			http.Error(w, `{"error":"ttl_seconds must be >= 1"}`, http.StatusBadRequest)
-			return
-		}
-		t := time.Now().Add(time.Duration(*req.TTLSeconds) * time.Second)
-		expiresAt = &t
-	}
-
-	id := uuid.NewString()
-
-	store[id] = &Paste{
+	id := uuid.New().String()
+	paste := &Paste{
 		ID:        id,
 		Content:   req.Content,
 		MaxViews:  req.MaxViews,
+		TTL:       req.TTL,
+		CreatedAt: time.Now(),
 		Views:     0,
-		ExpiresAt: expiresAt,
 	}
 
+	if req.TTL > 0 {
+		exp := paste.CreatedAt.Add(time.Duration(req.TTL) * time.Second)
+		paste.ExpiresAt = &exp
+	}
+
+	pastes[id] = paste
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":  id,
 		"url": "http://localhost:3000/paste/" + id,
@@ -86,8 +102,7 @@ func GetPaste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 🔹 View limit enforcement
-	if paste.MaxViews != nil && paste.Views >= *paste.MaxViews {
+	if paste.MaxViews != 0 && paste.Views >= paste.MaxViews {
 		http.NotFound(w, r)
 		return
 	}
@@ -95,8 +110,8 @@ func GetPaste(w http.ResponseWriter, r *http.Request) {
 	paste.Views++
 
 	var remaining *int
-	if paste.MaxViews != nil {
-		r := *paste.MaxViews - paste.Views
+	if paste.MaxViews != 0 {
+		r := paste.MaxViews - paste.Views
 		if r < 0 {
 			r = 0
 		}

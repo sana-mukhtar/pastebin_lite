@@ -5,18 +5,13 @@ import { useState } from "react";
 export default function Home() {
   const [content, setContent] = useState("");
   const [maxViews, setMaxViews] = useState(3);
-  const [ttlSeconds, setTtlSeconds] = useState(300); // default 5 minutes
+  const [ttlSeconds, setTtlSeconds] = useState(300);
   const [pasteURL, setPasteURL] = useState("");
   const [error, setError] = useState("");
 
   const createPaste = async () => {
-    setError("");       // clear previous error
-    setPasteURL("");    // clear previous URL
-
-    if (!content) {
-      setError("Content cannot be empty.");
-      return;
-    }
+    setError("");
+    setPasteURL("");
 
     try {
       const res = await fetch("http://localhost:8080/api/pastes", {
@@ -52,12 +47,10 @@ export default function Home() {
         placeholder="Enter your text here"
       />
       <div style={{ marginBottom: 10 }}>
-        Max Views:{" "}
-        <input type="number" value={maxViews} min={1} onChange={(e) => setMaxViews(Number(e.target.value))} style={{ ...smallInputStyle, width: 50 }} />
+        Max Views: <input type="number" value={maxViews} onChange={(e) => setMaxViews(Number(e.target.value))} style={{ ...smallInputStyle, width: 50 }} />
       </div>
       <div style={{ marginBottom: 10 }}>
-        TTL (seconds):{" "}
-        <input type="number" value={ttlSeconds} min={1} onChange={(e) => setTtlSeconds(Number(e.target.value))} style={smallInputStyle} />
+        TTL (seconds): <input type="number" value={ttlSeconds} onChange={(e) => setTtlSeconds(Number(e.target.value))} style={smallInputStyle} />
       </div>
       <button onClick={createPaste} style={{ width: "100%", padding: 10, background: "#0070f3", color: "#fff", border: "none", borderRadius: 4 }}>
         Create Paste
