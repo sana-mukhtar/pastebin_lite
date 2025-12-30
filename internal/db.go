@@ -3,25 +3,23 @@ package internal
 import (
 	"database/sql"
 	"log"
-	"os"
 
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
-func OpenDB() *sql.DB {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		log.Fatal("DATABASE_URL not set")
-	}
+var DB *sql.DB
 
-	db, err := sql.Open("postgres", dsn)
+func InitDB() {
+	var err error
+	// minimal DSN: user, password, dbname, sslmode
+	DB, err = sql.Open("postgres", "user=postgres password=mypassword dbname=pastebin sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := db.Ping(); err != nil {
+	if err := DB.Ping(); err != nil {
 		log.Fatal(err)
 	}
 
-	return db
+	log.Println("Connected to PostgreSQL successfully")
 }
