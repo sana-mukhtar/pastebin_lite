@@ -82,7 +82,7 @@ func CreatePasteHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":  id,
-		"url": "http://localhost:3000/paste/" + id,
+		"url": "http://localhost:3000/p/" + id,
 	})
 }
 
