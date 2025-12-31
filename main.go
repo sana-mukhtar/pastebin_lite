@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"pastebin/internal"
 
 	"github.com/gorilla/mux"
@@ -12,27 +13,30 @@ func main() {
 	internal.InitDB()
 
 	r := mux.NewRouter()
-	r.Use(cors)
 
-	r.HandleFunc("/api/healthz", health).Methods("GET", "OPTIONS")
+	// CORS middleware
+	r.Use(corsMiddleware)
+
+	// Routes
+	r.HandleFunc("/api/healthz", healthHandler).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/pastes", internal.CreatePasteHandler).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/pastes/{id}", internal.GetPaste).Methods("GET", "OPTIONS")
 
-	log.Println("Server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Println("Server running on :" + port)
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
-func health(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"ok":true}`))
-}
-
-func cors(next http.Handler) http.Handler {
+func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-test-now-ms")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -41,4 +45,10 @@ func cors(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"ok": true}`))
 }

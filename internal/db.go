@@ -3,6 +3,7 @@ package internal
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	_ "github.com/lib/pq"
 )
@@ -12,10 +13,8 @@ var DB *sql.DB
 func InitDB() {
 	var err error
 
-	DB, err = sql.Open(
-		"postgres",
-		"user=postgres password=postgres dbname=pastebin sslmode=disable",
-	)
+	DB, err = sql.Open("postgres", os.Getenv("DATABASE_URL"))
+
 	if err != nil {
 		log.Fatal(err)
 	}
