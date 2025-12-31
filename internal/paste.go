@@ -93,7 +93,7 @@ func GetPaste(w http.ResponseWriter, r *http.Request) {
 	paste, ok := pastes[id]
 	if !ok {
 		mu.Unlock()
-		http.NotFound(w, r)
+		jsonError(w)
 		return
 	}
 
@@ -101,17 +101,18 @@ func GetPaste(w http.ResponseWriter, r *http.Request) {
 	if paste.ExpiresAt != nil && time.Now().After(*paste.ExpiresAt) {
 		delete(pastes, id)
 		mu.Unlock()
-		http.NotFound(w, r)
+		jsonError(w)
 		return
 	}
 
 	// Max views check
 	if paste.MaxViews > 0 && paste.Views >= paste.MaxViews {
 		mu.Unlock()
-		http.NotFound(w, r)
+		jsonError(w)
 		return
 	}
 
+	// Count view
 	paste.Views++
 
 	var remaining *int
@@ -123,11 +124,23 @@ func GetPaste(w http.ResponseWriter, r *http.Request) {
 		remaining = &r
 	}
 
+	var expiresAt *time.Time
+	if paste.TTL > 0 {
+		expiresAt = paste.ExpiresAt
+	}
+
 	mu.Unlock()
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"content":         paste.Content,
-		"remaining_views": remaining,
-		"expires_at":      paste.ExpiresAt,
+		"remaining_views": remaining, // null if unlimited
+		"expires_at":      expiresAt, // null if no TTL
+	})
+}
+
+func jsonError(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": "paste unavailable",
 	})
 }
