@@ -3,6 +3,8 @@ package internal
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -84,6 +86,17 @@ func CreatePasteHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func now(r *http.Request) time.Time {
+	if os.Getenv("TEST_MODE") == "1" {
+		if v := r.Header.Get("x-test-now-ms"); v != "" {
+			if ms, err := strconv.ParseInt(v, 10, 64); err == nil {
+				return time.UnixMilli(ms)
+			}
+		}
+	}
+	return time.Now()
+}
+
 func GetPaste(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -98,7 +111,7 @@ func GetPaste(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TTL check
-	if paste.ExpiresAt != nil && time.Now().After(*paste.ExpiresAt) {
+	if paste.ExpiresAt != nil && now(r).After(*paste.ExpiresAt) {
 		delete(pastes, id)
 		mu.Unlock()
 		jsonError(w)
