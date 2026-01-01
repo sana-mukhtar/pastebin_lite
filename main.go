@@ -6,10 +6,16 @@ import (
 	"os"
 	"pastebin/internal"
 
+	"github.com/joho/godotenv"
+
 	"github.com/gorilla/mux"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
+		log.Fatalf("failed to load .env file: %v", err)
+	}
+
 	internal.InitDB()
 
 	r := mux.NewRouter()
