@@ -14,7 +14,7 @@ export default function Home() {
     setPasteURL("");
 
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_API_URL), {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, max_views: maxViews, ttl_seconds: ttlSeconds }),
