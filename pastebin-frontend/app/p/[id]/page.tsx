@@ -15,7 +15,7 @@ export default function PastePage() {
 
         async function fetchPaste() {
             try {
-                const res = await fetch(`http://localhost:8080/api/pastes/${id}`, {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${id}`, {
                     cache: "no-store",
                 });
                 if (!res.ok) {
