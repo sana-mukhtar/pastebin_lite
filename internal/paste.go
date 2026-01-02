@@ -89,9 +89,16 @@ func CreatePasteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+		frontendBase := os.Getenv("FRONTEND_URL")
+	if frontendBase == "" {
+		frontendBase = "http://localhost:3000"
+	}
+	// Ensure no trailing slash
+	frontendBase = strings.TrimRight(frontendBase, "/")
+
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":  id,
-		"url": "http://localhost:3000/p/" + id,
+		"url": frontendBase + "/p/" + id
 	})
 }
 
