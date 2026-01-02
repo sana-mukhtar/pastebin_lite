@@ -84,22 +84,24 @@ func CreatePasteHandler(w http.ResponseWriter, r *http.Request) {
 		id, req.Content, req.MaxViews, req.TTL, nowTime, expiresAt, 0,
 	)
 	if err != nil {
-		log.Println("===", err)
+		log.Println("DB insert error:", err)
 		http.Error(w, `{"error":"failed to save paste"}`, http.StatusInternalServerError)
 		return
 	}
 
-		frontendBase := os.Getenv("FRONTEND_URL")
+	frontendBase := os.Getenv("FRONTEND_URL")
 	if frontendBase == "" {
 		frontendBase = "http://localhost:3000"
 	}
-	// Ensure no trailing slash
 	frontendBase = strings.TrimRight(frontendBase, "/")
 
-	json.NewEncoder(w).Encode(map[string]string{
+	resp := map[string]string{
 		"id":  id,
-		"url": frontendBase + "/p/" + id
-	})
+		"url": frontendBase + "/p/" + id,
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Println("JSON encode error:", err)
+	}
 }
 
 // GetPaste retrieves a paste from Postgres
