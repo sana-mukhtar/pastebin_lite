@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -88,8 +89,8 @@ func CreatePasteHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"failed to save paste"}`, http.StatusInternalServerError)
 		return
 	}
-
-	frontendBase := os.Getenv("FRONTEND_URL")
+	
+    frontendBase := os.Getenv("FRONTEND_URL")
 	if frontendBase == "" {
 		frontendBase = "http://localhost:3000"
 	}
@@ -98,7 +99,7 @@ func CreatePasteHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":  id,
-		"url": frontendBase + "/p/" + id
+		"url": frontendBase + "/p/" + id,
 	})
 }
 
